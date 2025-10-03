@@ -35,4 +35,4 @@ jobs:
           REMOTE_HOST: ssh.inkfinit.com
           REMOTE_USER: u2050-grkr3li1rvfx
           REMOTE_PORT: 18765
-          TARGET: ~/public_html/
+          TARGET: "/home/u2050-grkr3li1rvfx/public_html/"
