@@ -36,3 +36,7 @@ jobs:
           REMOTE_USER: u2050-grkr3li1rvfx
           REMOTE_PORT: 18765
           TARGET: "/home/customer/www/inkfinit.com/public_html/"
+
+      - name: Remove Default.html
+        run: |
+          ssh -i ~/.ssh/siteground_deploy -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com "rm -f /home/customer/www/inkfinit.com/public_html/Default.html" || true
