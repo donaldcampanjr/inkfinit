@@ -1,17 +1,22 @@
-name: Deploy to SiteGround
+name: CI/CD Deploy to SiteGround
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [ "main" ]
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+      - dev
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-
+    if: github.event.action != 'closed'
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node
@@ -22,10 +27,30 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Run tests
+        run: npm test --if-present
+
       - name: Build project
         run: npm run build
 
-      - name: Deploy via SSH
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Deploy to Production or Staging
         uses: easingthemes/ssh-deploy@v4.1.10
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
@@ -35,8 +60,42 @@ jobs:
           REMOTE_HOST: ssh.inkfinit.com
           REMOTE_USER: u2050-grkr3li1rvfx
           REMOTE_PORT: 18765
-          TARGET: "/home/customer/www/inkfinit.com/public_html/"
+          TARGET: ${{ github.ref == 'refs/heads/main' && '/home/customer/www/inkfinit.com/public_html/' || '/home/customer/www/staging.inkfinit.com/public_html/' }}
 
-      - name: Remove Default.html
-        run: |
-          ssh -i ~/.ssh/siteground_deploy -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com "rm -f /home/customer/www/inkfinit.com/public_html/Default.html" || true
+  preview:
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Deploy PR Preview
+        uses: easingthemes/ssh-deploy@v4.1.10
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
+          PASSPHRASE: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
+          ARGS: "-rltgoDzvO --delete"
+          SOURCE: "dist/"
+          REMOTE_HOST: ssh.inkfinit.com
+          REMOTE_USER: u2050-grkr3li1rvfx
+          REMOTE_PORT: 18765
+          TARGET: "/home/customer/www/staging.inkfinit.com/public_html/pr-${{ github.event.pull_request.number }}/"
+
+  cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup PR Preview
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ssh.inkfinit.com
+          username: u2050-grkr3li1rvfx
+          port: 18765
+          key: ${{ secrets.SITEGROUND_KEY }}
+          passphrase: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
+          script: |
+            rm -rf /home/customer/www/staging.inkfinit.com/public_html/pr-${{ github.event.pull_request.number }}
