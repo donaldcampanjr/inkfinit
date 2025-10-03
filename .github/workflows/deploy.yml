@@ -29,8 +29,10 @@ jobs:
         uses: easingthemes/ssh-deploy@v4.1.10
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
+          PASSPHRASE: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
           ARGS: "-rltgoDzvO --delete"
           SOURCE: "dist/"
-          REMOTE_HOST: ${{ secrets.SITEGROUND_HOST }}
-          REMOTE_USER: ${{ secrets.SITEGROUND_USER }}
-          TARGET: ${{ secrets.SITEGROUND_PATH }}
+          REMOTE_HOST: ssh.inkfinit.com
+          REMOTE_USER: u2050-grkr3li1rvfx
+          REMOTE_PORT: 18765
+          TARGET: ~/public_html/
