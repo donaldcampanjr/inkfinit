@@ -1,96 +1,43 @@
-name: Deploy Inkfinit to Staging
-
-on:
+---
+name: "Deploy to SiteGround (Staging)"
+"on":
   push:
     branches:
       - dev
-  workflow_dispatch:
 
 jobs:
-  deploy-staging:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🧭 Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: 🏗️ Install dependencies
-        run: npm ci
-
-      - name: 🧱 Build with banner
-        run: |
-          export TZ="America/New_York"
-          timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
-          echo "🕒 Building for $timestamp"
-          banner="<div id='deploy-banner' style='position:fixed;top:10px;left:10px;background:#00ff99;color:#000;padding:8px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);z-index:9999;'>LIVE DEPLOY $timestamp</div>"
-          sed -i "s|</body>|${banner}\n</body>|i" index.html || true
-          npm run build
-
-      - name: 🚀 Deploy to SiteGround via SSH
+      - name: Setup SSH key
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p 18765 ssh.inkfinit.com >> ~/.ssh/known_hosts
 
-          echo "🔗 Syncing files to staging..."
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no" \
-            dist/ \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
-
-          echo "✅ Files deployed to staging."
-
-      - name: 🧹 Purge SiteGround cache (touch method)
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Deploy via rsync
         run: |
-          echo "♻️ Purging cache on SiteGround..."
+          echo "🚀 Deploying to SiteGround staging..."
+          rsync -avz --delete \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            ./ \
+            u2050-grkr3li1rvfx@ssh.inkfinit.com:\
+            /home/customer/www/staging.inkfinit.com/public_html/
+
+      - name: Purge SiteGround cache
+        run: |
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
             u2050-grkr3li1rvfx@ssh.inkfinit.com \
-            "find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} +"
+            "find /home/customer/www/staging.inkfinit.com/public_html/ -type f -exec touch {} +"
           echo "✅ Cache invalidated."
 
-      - name: 📧 Send deploy email (via SiteGround sendmail)
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          echo "✉️ Sending deploy email via SiteGround..."
-          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com 'bash -s' <<'REMOTE'
-              export TZ="America/New_York"
-              timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
-              tmpfile=$(mktemp /tmp/deploy_mail.XXXXXX)
-              {
-                echo "To: debug@inkfinit.com"
-                echo "From: Inkfinit CI/CD <debug@inkfinit.com>"
-                echo "Subject: ✅ Inkfinit staging deployed — $timestamp"
-                echo
-                echo "Deployment completed successfully on staging. (NJ local time)"
-                echo
-                echo "Time: $timestamp"
-                echo "Branch: dev"
-                echo "URL: https://staging.inkfinit.com"
-                echo
-                echo "Cache cleared, banner verified, and CI/CD finished."
-              } > "$tmpfile"
-              /usr/sbin/sendmail -t < "$tmpfile" && echo "✅ Email sent (server-side)" || echo "❌ Failed to send email"
-              rm -f "$tmpfile"
-REMOTE
-          echo "📨 Email step complete."
-
-      - name: 🧾 Done
+      - name: Done
         run: echo "✅ CI/CD complete at $(date)"
-<-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCQc/KDPQwMp+D+rOsCd/btlX6GxA7Z9w+zBzD5rQquHwAAAKCnIZ4tpyGe
-LQAAAAtzc2gtZWQyNTUxOQAAACCQc/KDPQwMp+D+rOsCd/btlX6GxA7Z9w+zBzD5rQquHw
-AAAEALj3tfbT/2yZsW73f1WrIQlkSPYAE+qwAJme6y+My16JBz8oM9DAyn4P6s6wJ39u2V
-fobEDtn3D7MHMPmtCq4fAAAAFnlvdXJfZW1haWxAZXhhbXBsZS5jb20BAgMEBQYH
------END OPENSSH PRIVATE trigger Sat Oct  4 16:22:35 EDT 2025 -->
