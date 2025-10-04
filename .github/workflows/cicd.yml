@@ -1,0 +1,87 @@
+name: Inkfinit CI/CD
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+  pull_request:
+    types: [closed]
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (22.12)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Determine target
+        id: target
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "dev" ]]; then
+            echo "path=/home/customer/www/staging.inkfinit.com/public_html" >> $GITHUB_OUTPUT
+            echo "url=https://staging.inkfinit.com" >> $GITHUB_OUTPUT
+          else
+            echo "path=/home/customer/www/inkfinit.com/public_html" >> $GITHUB_OUTPUT
+            echo "url=https://inkfinit.com" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ensure remote dirs (logs)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SG_HOST }}
+          username: ${{ secrets.SG_USER }}
+          port: ${{ secrets.SG_PORT }}
+          key: ${{ secrets.SITEGROUND_KEY }}
+          passphrase: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
+          script: |
+            mkdir -p "${{ steps.target.outputs.path }}/logs" "/home/customer/www/inkfinit.com/public_html/logs"
+
+      - name: Deploy via rsync
+        uses: easingthemes/ssh-deploy@v4.1.10
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
+          PASSPHRASE: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
+          ARGS: "-rltgoDzvO --delete"
+          SOURCE: "dist/"
+          REMOTE_HOST: ${{ secrets.SG_HOST }}
+          REMOTE_USER: ${{ secrets.SG_USER }}
+          REMOTE_PORT: ${{ secrets.SG_PORT }}
+          TARGET: "${{ steps.target.outputs.path }}"
+
+      - name: Permissions + log
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SG_HOST }}
+          username: ${{ secrets.SG_USER }}
+          port: ${{ secrets.SG_PORT }}
+          key: ${{ secrets.SITEGROUND_KEY }}
+          passphrase: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
+          script: |
+            find "${{ steps.target.outputs.path }}" -type f -exec chmod 644 {} \;
+            find "${{ steps.target.outputs.path }}" -type d -exec chmod 755 {} \;
+            echo "[CI:${GITHUB_REF_NAME}] OK at $(date)" >> "/home/customer/www/inkfinit.com/public_html/logs/deploy.log"
+
+      - name: Slack notify (optional)
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "✅ Deploy complete: *${GITHUB_REF_NAME}* → ${{ steps.target.outputs.url }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
