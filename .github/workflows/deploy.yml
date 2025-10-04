@@ -42,21 +42,21 @@ jobs:
             dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
           echo "✅ Deployed to staging. Check https://staging.inkfinit.com"
 
+      - name: 🧹 Flush SiteGround Dynamic Cache via SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
+          u2050-grkr3li1rvfx@ssh.inkfinit.com \
+          'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "🧹 Cache invalidated on server."'
+
       - name: 🔍 Verify banner on remote index.html
         run: |
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com \
           "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected' || echo '❌ Banner not found'"
-
-      - name: 🧹 Purge SiteGround Dynamic Cache (optional)
-        if: env.SG_API_TOKEN != ''
-        env:
-          SG_API_TOKEN: ${{ secrets.SG_API_TOKEN }}
-        run: |
-          curl -s -X POST "https://api.siteground.com/cache/v1/sites/purge" \
-          -H "Authorization: Bearer ${SG_API_TOKEN}" \
-          -H "Content-Type: application/json" \
-          -d '{"domain": "staging.inkfinit.com"}' \
-          && echo "✅ SiteGround cache purged."
 
   promote-live:
     if: github.event_name == 'workflow_dispatch'
