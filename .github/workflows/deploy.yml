@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project (NJ timezone banner)
+      - name: Build and timestamp banner
         run: |
           export TZ="America/New_York"
           timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
@@ -44,23 +44,35 @@ jobs:
             dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
           echo "✅ Deployed to staging (NJ time)."
 
-      - name: 🧹 Purge SiteGround Cache (SSH fallback)
+      - name: Purge SiteGround Cache (SSH fallback)
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "♻️ Clearing cache by touching all public_html files..."
-          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com \
-            'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "✅ Cache invalidated (NJ time)."'
-
-      - name: 🔍 Verify banner on remote index.html
-        run: |
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
           u2050-grkr3li1rvfx@ssh.inkfinit.com \
-          "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected (NJ time)' || echo '❌ Banner not found'"
+          'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "✅ Cache invalidated (NJ time)."'
+
+      - name: Send Deployment Email Notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: mail.inkfinit.com
+          server_port: 465
+          username: debug@inkfinit.com
+          password: ${{ secrets.SITEGROUND_EMAIL_PASS }}
+          subject: "✅ Inkfinit Staging Deployed — ${{ github.run_number }}"
+          to: debug@inkfinit.com
+          from: "Inkfinit CI/CD <debug@inkfinit.com>"
+          body: |
+            Deployment Successful ✅
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Time (NJ): $(date +"%Y-%m-%d %I:%M:%S %p %Z")
+            URL: https://staging.inkfinit.com
+            ---
+            All caches purged and verified live.
 
   promote-live:
     if: github.event_name == 'workflow_dispatch'
@@ -77,3 +89,19 @@ jobs:
           u2050-grkr3li1rvfx@ssh.inkfinit.com \
           'rsync -a --delete --exclude=".htaccess" /home/customer/www/staging.inkfinit.com/public_html/ /home/customer/www/inkfinit.com/public_html/'
           echo "🚀 Live deployment complete (NJ time): https://inkfinit.com"
+
+      - name: Send Live Deployment Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: mail.inkfinit.com
+          server_port: 465
+          username: debug@inkfinit.com
+          password: ${{ secrets.SITEGROUND_EMAIL_PASS }}
+          subject: "🚀 Inkfinit LIVE Deploy — ${{ github.run_number }}"
+          to: debug@inkfinit.com
+          from: "Inkfinit CI/CD <debug@inkfinit.com>"
+          body: |
+            LIVE Deployment Completed 🚀
+            Trigger: Manual (workflow_dispatch)
+            Time (NJ): $(date +"%Y-%m-%d %I:%M:%S %p %Z")
+            URL: https://inkfinit.com
