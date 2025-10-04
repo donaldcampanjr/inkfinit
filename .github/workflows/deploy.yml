@@ -53,3 +53,25 @@ jobs:
 
       - name: Done
         run: echo "✅ CI/CD complete at $(date)"
+
+      - name: Ensure .htaccess MIME fix
+        run: |
+          echo "📜 Writing .htaccess MIME configuration..."
+          cat > dist/.htaccess <<'HTACCESS'
+# --- MIME Fix for React/Vite ---
+AddType application/javascript .js
+AddType text/css .css
+AddType application/json .json
+AddType image/svg+xml .svg
+AddType application/wasm .wasm
+AddType application/javascript .mjs
+AddType application/javascript .jsx
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|jsx|mjs)$">
+    Header set Content-Type "application/javascript; charset=UTF-8"
+  </FilesMatch>
+</IfModule>
+
+DirectoryIndex index.html
+HTACCESS
