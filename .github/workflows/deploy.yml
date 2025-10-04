@@ -55,22 +55,23 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           echo "📨 Sending deployment email from SiteGround server..."
-          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com <<'REMOTE'
-              export TZ="America/New_York"
-              timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
-              echo "To: debug@inkfinit.com" > /tmp/deploy_mail.txt
-              echo "From: Inkfinit CI/CD <debug@inkfinit.com>" >> /tmp/deploy_mail.txt
-              echo "Subject: ✅ Inkfinit Staging Deployed — ${timestamp}" >> /tmp/deploy_mail.txt
-              echo "" >> /tmp/deploy_mail.txt
-              echo "✅ Deployment completed successfully." >> /tmp/deploy_mail.txt
-              echo "Branch: dev" >> /tmp/deploy_mail.txt
-              echo "Commit: ${GITHUB_SHA}" >> /tmp/deploy_mail.txt
-              echo "Time: ${timestamp}" >> /tmp/deploy_mail.txt
-              echo "URL: https://staging.inkfinit.com" >> /tmp/deploy_mail.txt
-              echo "" >> /tmp/deploy_mail.txt
-              echo "Cache purged, verified, and banner live." >> /tmp/deploy_mail.txt
-              /usr/sbin/sendmail -t < /tmp/deploy_mail.txt
-              rm -f /tmp/deploy_mail.txt
-              echo "✅ Email dispatched internally via sendmail (NJ time)."
-REMOTE
+          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com <<'EOF'
+            export TZ="America/New_York"
+            timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
+            {
+              echo "To: debug@inkfinit.com"
+              echo "From: Inkfinit CI/CD <debug@inkfinit.com>"
+              echo "Subject: ✅ Inkfinit Staging Deployed — ${timestamp}"
+              echo ""
+              echo "✅ Deployment completed successfully."
+              echo "Branch: dev"
+              echo "Commit: ${GITHUB_SHA}"
+              echo "Time: ${timestamp}"
+              echo "URL: https://staging.inkfinit.com"
+              echo ""
+              echo "Cache purged, verified, and banner live."
+            } > /tmp/deploy_mail.txt
+            /usr/sbin/sendmail -t < /tmp/deploy_mail.txt
+            rm -f /tmp/deploy_mail.txt
+            echo "✅ Email dispatched internally via sendmail (NJ time)."
+EOF
