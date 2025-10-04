@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project with NJ timezone banner
+      - name: Build project (NJ timezone banner)
         run: |
           export TZ="America/New_York"
           timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
@@ -42,18 +42,19 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no" \
             --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='.env' \
             dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
-          echo "✅ Deployed to staging (NJ local time). Check https://staging.inkfinit.com"
+          echo "✅ Deployed to staging (NJ time)."
 
-      - name: 🧹 Invalidate SiteGround cache via SSH
+      - name: 🧹 Purge SiteGround Cache (SSH fallback)
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          echo "♻️ Clearing cache by touching all public_html files..."
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
-          u2050-grkr3li1rvfx@ssh.inkfinit.com \
-          'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "🧹 Cache invalidated on server (NJ time)."'
+            u2050-grkr3li1rvfx@ssh.inkfinit.com \
+            'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "✅ Cache invalidated (NJ time)."'
 
       - name: 🔍 Verify banner on remote index.html
         run: |
