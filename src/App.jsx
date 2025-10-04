@@ -9,3 +9,20 @@ export default function App() {
 <div style='position:fixed;top:10px;left:10px;z-index:9999;background:#00ff99;color:#000;padding:6px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);'>
 🚀 CI/CD DEPLOY SUCCESS — 2025-10-04_14-06-24
 </div>
+
+{/* === AUTO-DEPLOY BANNER 2025-10-04_14-10-35 === */}
+<div style={{
+  position: 'fixed',
+  top: '10px',
+  left: '10px',
+  backgroundColor: '#00ff99',
+  color: '#000',
+  padding: '8px 14px',
+  fontWeight: 'bold',
+  borderRadius: '6px',
+  boxShadow: '0 0 10px rgba(0,0,0,0.4)',
+  zIndex: 9999
+}}>
+  🚀 CI/CD DEPLOY SUCCESS — 2025-10-04_14-10-35
+</div>
+{/* === END AUTO-DEPLOY BANNER === */}
