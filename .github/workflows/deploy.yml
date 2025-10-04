@@ -21,8 +21,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
+      - name: Build project with visible timestamp banner
+        run: |
+          timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+          banner="<div id='deploy-banner' style='position:fixed;top:10px;left:10px;background:#00ff99;color:#000;padding:8px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);z-index:9999;'>LIVE DEPLOY ${timestamp}</div>"
+          sed -i "/id='deploy-banner'/d" index.html || true
+          sed -i "s|</body>|${banner}\n</body>|i" index.html
+          npm run build
 
       - name: Deploy to SiteGround Staging
         env:
@@ -36,6 +41,22 @@ jobs:
             --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='.env' \
             dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
           echo "✅ Deployed to staging. Check https://staging.inkfinit.com"
+
+      - name: 🔍 Verify banner on remote index.html
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com \
+          "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected' || echo '❌ Banner not found'"
+
+      - name: 🧹 Purge SiteGround Dynamic Cache (optional)
+        if: env.SG_API_TOKEN != ''
+        env:
+          SG_API_TOKEN: ${{ secrets.SG_API_TOKEN }}
+        run: |
+          curl -s -X POST "https://api.siteground.com/cache/v1/sites/purge" \
+          -H "Authorization: Bearer ${SG_API_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d '{"domain": "staging.inkfinit.com"}' \
+          && echo "✅ SiteGround cache purged."
 
   promote-live:
     if: github.event_name == 'workflow_dispatch'
