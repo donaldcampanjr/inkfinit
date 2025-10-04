@@ -1,28 +1,15 @@
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white text-center space-y-6">
-      <h1 className="text-5xl font-bold tracking-wide">⚙️ DEV SYNC TEST</h1>
-      <p className="text-lg text-gray-400">This is a live staging update from local → GitHub → SiteGround</p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-100">
+      <h1 className="text-5xl font-bold mb-4 flex items-center gap-2">
+        <span>⚙️</span> DEV SYNC TEST
+      </h1>
+      <p className="text-lg text-gray-400">
+        This is a lightweight layout push to verify CI/CD + staging deploy.
+      </p>
+      <div className="mt-6 px-4 py-2 bg-emerald-500 text-black inline-block rounded-lg font-semibold">
+        LIVE SYNC TEST — {new Date().toLocaleString("en-US", { timeZone: "America/New_York" })}
+      </div>
     </div>
   );
 }
-<div style='position:fixed;top:10px;left:10px;z-index:9999;background:#00ff99;color:#000;padding:6px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);'>
-🚀 CI/CD DEPLOY SUCCESS — 2025-10-04_14-06-24
-</div>
-
-{/* === AUTO-DEPLOY BANNER 2025-10-04_14-10-35 === */}
-<div style={{
-  position: 'fixed',
-  top: '10px',
-  left: '10px',
-  backgroundColor: '#00ff99',
-  color: '#000',
-  padding: '8px 14px',
-  fontWeight: 'bold',
-  borderRadius: '6px',
-  boxShadow: '0 0 10px rgba(0,0,0,0.4)',
-  zIndex: 9999
-}}>
-  🚀 CI/CD DEPLOY SUCCESS — 2025-10-04_14-10-35
-</div>
-{/* === END AUTO-DEPLOY BANNER === */}
