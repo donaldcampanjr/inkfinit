@@ -6,3 +6,6 @@ export default function App() {
     </div>
   );
 }
+<div style='position:fixed;top:10px;left:10px;z-index:9999;background:#00ff99;color:#000;padding:6px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);'>
+🚀 CI/CD DEPLOY SUCCESS — 2025-10-04_14-06-24
+</div>
