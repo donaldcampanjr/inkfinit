@@ -1,16 +1,19 @@
-name: Inkfinit Auto Deploy
+name: Deploy Inkfinit to Staging
 
 on:
   push:
     branches:
       - dev
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   deploy-staging:
-    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
+
     steps:
+      - name: Set up job
+        run: echo "🚀 Starting Inkfinit CI/CD deploy (NJ timezone enforced)..."
+
       - uses: actions/checkout@v4
 
       - name: Setup Node
@@ -55,6 +58,12 @@ jobs:
           u2050-grkr3li1rvfx@ssh.inkfinit.com \
           'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "✅ Cache invalidated (NJ time)."'
 
+      - name: Verify remote banner
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
+          u2050-grkr3li1rvfx@ssh.inkfinit.com \
+          "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected' || echo '❌ Banner missing'"
+
       - name: Send Deployment Email Notification
         uses: dawidd6/action-send-mail@v3
         with:
@@ -63,15 +72,16 @@ jobs:
           username: debug@inkfinit.com
           password: ${{ secrets.SITEGROUND_EMAIL_PASS }}
           subject: "✅ Inkfinit Staging Deployed — ${{ github.run_number }}"
-          to: debug@inkfinit.com
+          to: deploy@inkfinit.com
           from: "Inkfinit CI/CD <debug@inkfinit.com>"
           body: |
-            Deployment Successful ✅
+            ✅ Deployment Successful (NJ Time)
+            ────────────────────────────────
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
-            Time (NJ): $(date +"%Y-%m-%d %I:%M:%S %p %Z")
+            Time: $(date +"%Y-%m-%d %I:%M:%S %p %Z")
             URL: https://staging.inkfinit.com
-            ---
+            ────────────────────────────────
             All caches purged and verified live.
 
   promote-live:
@@ -89,19 +99,3 @@ jobs:
           u2050-grkr3li1rvfx@ssh.inkfinit.com \
           'rsync -a --delete --exclude=".htaccess" /home/customer/www/staging.inkfinit.com/public_html/ /home/customer/www/inkfinit.com/public_html/'
           echo "🚀 Live deployment complete (NJ time): https://inkfinit.com"
-
-      - name: Send Live Deployment Email
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: mail.inkfinit.com
-          server_port: 465
-          username: debug@inkfinit.com
-          password: ${{ secrets.SITEGROUND_EMAIL_PASS }}
-          subject: "🚀 Inkfinit LIVE Deploy — ${{ github.run_number }}"
-          to: debug@inkfinit.com
-          from: "Inkfinit CI/CD <debug@inkfinit.com>"
-          body: |
-            LIVE Deployment Completed 🚀
-            Trigger: Manual (workflow_dispatch)
-            Time (NJ): $(date +"%Y-%m-%d %I:%M:%S %p %Z")
-            URL: https://inkfinit.com
