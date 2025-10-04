@@ -1,6 +1,6 @@
 ---
 name: "Deploy to SiteGround (Staging)"
-"on":
+on:
   push:
     branches:
       - dev
@@ -24,13 +24,14 @@ jobs:
 
       - name: Deploy via rsync
         run: |
-          echo "🚀 Deploying to SiteGround staging..."
+          echo "🚀 Deploying to SiteGround staging (port 18765)..."
           rsync -avz --delete \
+            -e "ssh -p 18765 -o StrictHostKeyChecking=no" \
             --exclude ".git/" \
             --exclude ".github/" \
             ./ \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com:\
-            /home/customer/www/staging.inkfinit.com/public_html/
+            u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
+          echo "✅ rsync completed successfully."
 
       - name: Purge SiteGround cache
         run: |
