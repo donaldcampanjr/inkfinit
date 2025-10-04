@@ -11,67 +11,79 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: 🧭 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: ⚙️ Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Build and timestamp banner
+      - name: 🏗️ Install dependencies
+        run: npm ci
+
+      - name: 🧱 Build with banner
         run: |
           export TZ="America/New_York"
           timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
-          echo "🕒 NJ Local Time: ${timestamp}"
-          banner="<div id='deploy-banner' style='position:fixed;top:10px;left:10px;background:#00ff99;color:#000;padding:8px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);z-index:9999;'>LIVE DEPLOY ${timestamp}</div>"
-          sed -i "/id='deploy-banner'/d" index.html || true
-          sed -i "s|</body>|${banner}\n</body>|i" index.html
+          echo "🕒 Building for $timestamp"
+          banner="<div id='deploy-banner' style='position:fixed;top:10px;left:10px;background:#00ff99;color:#000;padding:8px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);z-index:9999;'>LIVE DEPLOY $timestamp</div>"
+          sed -i "s|</body>|${banner}\n</body>|i" index.html || true
           npm run build
 
-      - name: Deploy to SiteGround Staging
+      - name: 🚀 Deploy to SiteGround via SSH
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+
+          echo "🔗 Syncing files to staging..."
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no" \
-            --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='.env' \
-            dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
+            dist/ \
+            u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
+
           echo "✅ Files deployed to staging."
 
-      - name: Purge SiteGround Cache (SSH fallback)
+      - name: 🧹 Purge SiteGround cache (touch method)
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
+          echo "♻️ Purging cache on SiteGround..."
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
             u2050-grkr3li1rvfx@ssh.inkfinit.com \
-            'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "✅ Cache invalidated (NJ time)."'
+            "find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} +"
+          echo "✅ Cache invalidated."
 
-      - name: Send Deployment Email Notification (server-side)
+      - name: 📧 Send deploy email (via SiteGround sendmail)
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "📧 Sending deployment email via SiteGround sendmail..."
+          echo "✉️ Sending deploy email via SiteGround..."
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
-            u2050-grkr3li1rvfx@ssh.inkfinit.com "bash -s" <<'EOF'
+            u2050-grkr3li1rvfx@ssh.inkfinit.com 'bash -s' <<'REMOTE'
               export TZ="America/New_York"
               timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
-              tmpfile=/tmp/deploy_mail.txt
+              tmpfile=$(mktemp /tmp/deploy_mail.XXXXXX)
               {
                 echo "To: debug@inkfinit.com"
                 echo "From: Inkfinit CI/CD <debug@inkfinit.com>"
-                echo "Subject: ✅ Inkfinit Staging Deploy — ${timestamp}"
-                echo ""
-                echo "✅ Deployment completed successfully."
+                echo "Subject: ✅ Inkfinit staging deployed — $timestamp"
+                echo
+                echo "Deployment completed successfully on staging. (NJ local time)"
+                echo
+                echo "Time: $timestamp"
                 echo "Branch: dev"
-                echo "Time: ${timestamp}"
                 echo "URL: https://staging.inkfinit.com"
-                echo ""
-                echo "Cache purged, verified, and banner injected live."
-              } > $tmpfile
-              /usr/sbin/sendmail -t < $tmpfile && echo "✅ Email sent successfully (NJ time)" || echo "❌ Failed to send email"
-              rm -f $tmpfile
-EOF
+                echo
+                echo "Cache cleared, banner verified, and CI/CD finished."
+              } > "$tmpfile"
+              /usr/sbin/sendmail -t < "$tmpfile" && echo "✅ Email sent (server-side)" || echo "❌ Failed to send email"
+              rm -f "$tmpfile"
+REMOTE
+          echo "📨 Email step complete."
+
+      - name: 🧾 Done
+        run: echo "✅ CI/CD complete at $(date)"
