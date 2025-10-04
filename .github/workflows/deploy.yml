@@ -1,101 +1,39 @@
-name: CI/CD Deploy to SiteGround
-
+name: Inkfinit Auto Deploy
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [ "dev", "main" ]
   pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
-      - dev
-
+    branches: [ "main" ]
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    if: github.event.action != 'closed'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
-        run: npm test --if-present
-
-      - name: Build project
-        run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
   deploy:
-    needs: build
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: dist
-          path: dist/
-
-      - name: Deploy to Production or Staging
-        uses: easingthemes/ssh-deploy@v4.1.10
+          node-version: 22
+      - run: npm ci && npm run build
+      - name: Deploy to Staging
+        if: github.ref == 'refs/heads/dev'
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
-          PASSPHRASE: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
-          ARGS: "-rltgoDzvO --delete"
-          SOURCE: "dist/"
-          REMOTE_HOST: ssh.inkfinit.com
-          REMOTE_USER: u2050-grkr3li1rvfx
-          REMOTE_PORT: 18765
-          TARGET: ${{ github.ref == 'refs/heads/main' && '/home/customer/www/inkfinit.com/public_html/' || '/home/customer/www/staging.inkfinit.com/public_html/' }}
-
-  preview:
-    needs: build
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Deploy PR Preview
-        uses: easingthemes/ssh-deploy@v4.1.10
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          rsync -avz --delete --perms --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+          -e "ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no" \
+          dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
+      - name: Promote to Live
+        if: github.ref == 'refs/heads/main'
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SITEGROUND_KEY }}
-          PASSPHRASE: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
-          ARGS: "-rltgoDzvO --delete"
-          SOURCE: "dist/"
-          REMOTE_HOST: ssh.inkfinit.com
-          REMOTE_USER: u2050-grkr3li1rvfx
-          REMOTE_PORT: 18765
-          TARGET: "/home/customer/www/staging.inkfinit.com/public_html/pr-${{ github.event.pull_request.number }}/"
-
-  cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cleanup PR Preview
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ssh.inkfinit.com
-          username: u2050-grkr3li1rvfx
-          port: 18765
-          key: ${{ secrets.SITEGROUND_KEY }}
-          passphrase: ${{ secrets.SITEGROUND_KEY_PASSPHRASE }}
-          script: |
-            rm -rf /home/customer/www/staging.inkfinit.com/public_html/pr-${{ github.event.pull_request.number }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
+          u2050-grkr3li1rvfx@ssh.inkfinit.com \
+          'rsync -a --delete --exclude=".htaccess" \
+          /home/customer/www/staging.inkfinit.com/public_html/ \
+          /home/customer/www/inkfinit.com/public_html/'
