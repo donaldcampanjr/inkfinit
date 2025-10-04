@@ -21,10 +21,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project with visible EST timestamp banner
+      - name: Build project with NJ timezone banner
         run: |
-          # Convert time to Eastern Time (America/New_York)
-          timestamp=$(TZ="America/New_York" date +"%Y-%m-%d %I:%M:%S %p %Z")
+          sudo apt-get update -y >/dev/null 2>&1
+          sudo apt-get install -y tzdata >/dev/null 2>&1
+          ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime
+          dpkg-reconfigure -f noninteractive tzdata
+          timestamp=$(date +"%Y-%m-%d %I:%M:%S %p %Z")
+          echo "🕒 NJ Local Time: ${timestamp}"
           banner="<div id='deploy-banner' style='position:fixed;top:10px;left:10px;background:#00ff99;color:#000;padding:8px 12px;font-weight:bold;border-radius:6px;box-shadow:0 0 10px rgba(0,0,0,0.3);z-index:9999;'>LIVE DEPLOY ${timestamp}</div>"
           sed -i "/id='deploy-banner'/d" index.html || true
           sed -i "s|</body>|${banner}\n</body>|i" index.html
@@ -41,9 +45,9 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no" \
             --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='.env' \
             dist/ u2050-grkr3li1rvfx@ssh.inkfinit.com:/home/customer/www/staging.inkfinit.com/public_html/
-          echo "✅ Deployed to staging (EST banner). Check https://staging.inkfinit.com"
+          echo "✅ Deployed to staging (NJ time). Check https://staging.inkfinit.com"
 
-      - name: 🧹 Flush SiteGround Dynamic Cache via SSH
+      - name: 🧹 Invalidate SiteGround cache via SSH
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
@@ -52,12 +56,12 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no \
           u2050-grkr3li1rvfx@ssh.inkfinit.com \
-          'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "🧹 Cache invalidated on server (EST build)."'
+          'find /home/customer/www/staging.inkfinit.com/public_html -type f -exec touch {} + && echo "🧹 Cache invalidated (NJ time)."'
 
-      - name: 🔍 Verify banner on remote index.html
+      - name: 🔍 Verify banner exists remotely
         run: |
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com \
-          "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected' || echo '❌ Banner not found'"
+          "grep -m1 'deploy-banner' /home/customer/www/staging.inkfinit.com/public_html/index.html && echo '✅ Banner detected (NJ time)' || echo '❌ Banner not found'"
 
   promote-live:
     if: github.event_name == 'workflow_dispatch'
@@ -72,4 +76,4 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh -i ~/.ssh/id_ed25519 -p 18765 -o StrictHostKeyChecking=no u2050-grkr3li1rvfx@ssh.inkfinit.com \
           'rsync -a --delete --exclude=".htaccess" /home/customer/www/staging.inkfinit.com/public_html/ /home/customer/www/inkfinit.com/public_html/'
-          echo "🚀 Live deployment complete (EST time): https://inkfinit.com"
+          echo "🚀 Live deployment complete (NJ local time): https://inkfinit.com"
